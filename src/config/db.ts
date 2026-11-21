@@ -2,45 +2,48 @@
 import { MongoClient, type Db } from "mongodb";
 
 import { env } from "./env.js";
+import { createDatabaseIndexes } from "./databaseIndexes.js";
+import { createDatabaseValidators } from "./databaseValidators.js";
 
-// MongoDB client instance
 let client: MongoClient | null = null;
-
-// Database instance
 let database: Db | null = null;
 
-// Connect to MongoDB
 export async function connectDatabase(): Promise<Db> {
-  // Reuse existing connection
-  if (database) {
-    return database;
-  }
+  if (database) return database;
 
-  // Check MongoDB connection string
   if (!env.MONGODB_URI) {
     throw new Error("MONGODB_URI is not configured.");
   }
 
-  // Create MongoDB client
   const mongoClient = new MongoClient(env.MONGODB_URI, {
     serverSelectionTimeoutMS: 10000,
   });
 
-  // Connect to MongoDB Atlas
-  await mongoClient.connect();
+  try {
+    await mongoClient.connect();
 
-  // Store connection instances
-  client = mongoClient;
-  database = mongoClient.db(env.MONGODB_DB_NAME);
+    const db = mongoClient.db(env.MONGODB_DB_NAME);
 
-  console.log(
-    `MongoDB connected successfully: ${env.MONGODB_DB_NAME}`
-  );
+    // Create indexes first. This also ensures collections exist.
+    await createDatabaseIndexes(db);
 
-  return database;
+    // Apply MongoDB document validation rules.
+    await createDatabaseValidators(db);
+
+    client = mongoClient;
+    database = db;
+
+    console.log(
+      `MongoDB connected successfully: ${env.MONGODB_DB_NAME}`
+    );
+
+    return db;
+  } catch (error) {
+    await mongoClient.close();
+    throw error;
+  }
 }
 
-// Get existing database instance
 export function getDatabase(): Db {
   if (!database) {
     throw new Error(
@@ -51,7 +54,6 @@ export function getDatabase(): Db {
   return database;
 }
 
-// Close MongoDB connection
 export async function closeDatabase(): Promise<void> {
   if (client) {
     await client.close();
