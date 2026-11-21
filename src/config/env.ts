@@ -5,6 +5,12 @@ import { z } from "zod";
 // Load environment variables from .env
 dotenv.config();
 
+// Convert empty environment values to undefined
+const optionalString = z.preprocess(
+  (value) => (value === "" ? undefined : value),
+  z.string().trim().min(1).optional()
+);
+
 // Define environment variable validation rules
 const envSchema = z.object({
   NODE_ENV: z
@@ -18,7 +24,7 @@ const envSchema = z.object({
     .url()
     .default("http://localhost:3000"),
 
-  MONGODB_URI: z.string().trim().min(1).optional(),
+  MONGODB_URI: optionalString,
 
   MONGODB_DB_NAME: z
     .string()
@@ -26,18 +32,21 @@ const envSchema = z.object({
     .min(1)
     .default("mentorlagbe"),
 
-  BETTER_AUTH_SECRET: z
-    .string()
-    .min(32)
-    .optional(),
+  BETTER_AUTH_SECRET: z.preprocess(
+    (value) => (value === "" ? undefined : value),
+    z.string().min(32).optional()
+  ),
 
-  BETTER_AUTH_URL: z.string().url().optional(),
+  BETTER_AUTH_URL: z.preprocess(
+    (value) => (value === "" ? undefined : value),
+    z.string().url().optional()
+  ),
 
-  STRIPE_SECRET_KEY: z.string().optional(),
+  STRIPE_SECRET_KEY: optionalString,
 
-  STRIPE_WEBHOOK_SECRET: z.string().optional(),
+  STRIPE_WEBHOOK_SECRET: optionalString,
 
-  IMGBB_API_KEY: z.string().optional(),
+  IMGBB_API_KEY: optionalString,
 });
 
 // Validate environment variables
