@@ -1,9 +1,17 @@
 
+import { setServers } from "node:dns";
+
 import { env } from "./config/env.js";
 import {
   closeDatabase,
   connectDatabase,
 } from "./config/db.js";
+
+// Configure DNS before MongoDB performs SRV record lookup.
+if (env.NODE_ENV === "development") {
+  setServers(["8.8.8.8", "1.1.1.1"]);
+  console.log("[DNS] Configured Google and Cloudflare DNS.");
+}
 
 async function startServer() {
   try {
@@ -13,14 +21,14 @@ async function startServer() {
     // Load Express application after database initialization.
     const { default: app } = await import("./app.js");
 
-    // Start HTTP server
+    // Start HTTP server.
     const server = app.listen(env.PORT, () => {
       console.log(
         `MentorLagbe server running at http://localhost:${env.PORT}`
       );
     });
 
-    // Graceful shutdown
+    // Graceful shutdown.
     const shutdown = (signal: string) => {
       console.log(`${signal} received. Closing server...`);
 

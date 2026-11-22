@@ -1,4 +1,3 @@
-
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -10,9 +9,11 @@ import { auth } from "./lib/auth.js";
 
 import { notFound } from "./middleware/notFound.js";
 import { errorHandler } from "./middleware/errorHandler.js";
+
 import { sendSuccess } from "./utils/apiResponse.js";
 
 import userRoutes from "./modules/users/user.routes.js";
+import tuitionRoutes from "./modules/tuitions/tuition.routes.js";
 
 const app = express();
 
@@ -52,6 +53,9 @@ app.get("/health", (_req, res) => {
 
 // User routes
 app.use("/api/users", userRoutes);
+
+// Tuition routes
+app.use("/api/tuitions", tuitionRoutes);
 
 // Handle unknown routes
 app.use(notFound);
