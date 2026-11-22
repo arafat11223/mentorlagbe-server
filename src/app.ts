@@ -1,14 +1,19 @@
+
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
+import { toNodeHandler } from "better-auth/node";
 
 import { env } from "./config/env.js";
+import { auth } from "./lib/auth.js";
+
 import { notFound } from "./middleware/notFound.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { sendSuccess } from "./utils/apiResponse.js";
 
-// Initialize Express application
+import userRoutes from "./modules/users/user.routes.js";
+
 const app = express();
 
 // Security middleware
@@ -25,7 +30,10 @@ app.use(
 // Request logging
 app.use(morgan(env.NODE_ENV === "development" ? "dev" : "combined"));
 
-// Parse JSON request bodies
+// Better Auth must be mounted before body parsers.
+app.all("/api/auth/*splat", toNodeHandler(auth));
+
+// Parse JSON request bodies for other API routes
 app.use(express.json({ limit: "1mb" }));
 
 // Parse URL-encoded request bodies
@@ -41,6 +49,9 @@ app.get("/health", (_req, res) => {
     },
   });
 });
+
+// User routes
+app.use("/api/users", userRoutes);
 
 // Handle unknown routes
 app.use(notFound);

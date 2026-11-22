@@ -1,5 +1,4 @@
 
-import app from "./app.js";
 import { env } from "./config/env.js";
 import {
   closeDatabase,
@@ -8,8 +7,11 @@ import {
 
 async function startServer() {
   try {
-    // Connect to MongoDB before starting the server
+    // Connect to MongoDB before loading authentication.
     await connectDatabase();
+
+    // Load Express application after database initialization.
+    const { default: app } = await import("./app.js");
 
     // Start HTTP server
     const server = app.listen(env.PORT, () => {
@@ -42,7 +44,6 @@ async function startServer() {
       });
     };
 
-    // Handle termination signals
     process.on("SIGINT", () => shutdown("SIGINT"));
     process.on("SIGTERM", () => shutdown("SIGTERM"));
   } catch (error) {

@@ -24,10 +24,7 @@ export async function connectDatabase(): Promise<Db> {
 
     const db = mongoClient.db(env.MONGODB_DB_NAME);
 
-    // Create indexes first. This also ensures collections exist.
     await createDatabaseIndexes(db);
-
-    // Apply MongoDB document validation rules.
     await createDatabaseValidators(db);
 
     client = mongoClient;
@@ -52,6 +49,16 @@ export function getDatabase(): Db {
   }
 
   return database;
+}
+
+export function getMongoClient(): MongoClient {
+  if (!client) {
+    throw new Error(
+      "MongoDB client is not connected. Call connectDatabase() first."
+    );
+  }
+
+  return client;
 }
 
 export async function closeDatabase(): Promise<void> {
