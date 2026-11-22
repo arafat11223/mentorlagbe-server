@@ -14,6 +14,7 @@ import { sendSuccess } from "./utils/apiResponse.js";
 
 import userRoutes from "./modules/users/user.routes.js";
 import tuitionRoutes from "./modules/tuitions/tuition.routes.js";
+import statisticsRoutes from "./modules/statistics/statistics.routes.js";
 
 const app = express();
 
@@ -56,6 +57,9 @@ app.use("/api/users", userRoutes);
 
 // Tuition routes
 app.use("/api/tuitions", tuitionRoutes);
+
+// Public platform statistics
+app.use("/api/statistics", statisticsRoutes);
 
 // Handle unknown routes
 app.use(notFound);
