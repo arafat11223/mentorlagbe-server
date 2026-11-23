@@ -1,4 +1,4 @@
-﻿import { ObjectId, type Filter, type WithId } from "mongodb";
+import { ObjectId, type Filter, type WithId } from "mongodb";
 
 import { tuitionRepository } from "../../repositories/index.js";
 import { tuitionsCollection } from "../../config/database.js";
@@ -374,5 +374,43 @@ export async function getTutorTuitions(
       total,
       totalPages: Math.ceil(total / query.limit),
     },
+  };
+}
+
+// Get one non-deleted tuition post owned by the authenticated tutor.
+export async function getTutorTuitionById(
+  id: string,
+  currentUser: UserDocument
+) {
+  if (!ObjectId.isValid(id)) {
+    throw new AppError("Invalid tuition ID.", 400);
+  }
+
+  const tuition = await tuitionRepository.findOne({
+    _id: new ObjectId(id),
+    tutorId: currentUser._id,
+    deletedAt: null,
+  });
+
+  if (!tuition) {
+    throw new AppError("Tuition post not found.", 404);
+  }
+
+  return {
+    _id: tuition._id,
+    title: tuition.title,
+    tuitionType: tuition.tuitionType,
+    subject: tuition.subject,
+    classLevel: tuition.classLevel,
+    mode: tuition.mode,
+    location: tuition.location,
+    monthlyFee: tuition.monthlyFee,
+    daysPerWeek: tuition.daysPerWeek,
+    bannerImage: tuition.bannerImage,
+    description: tuition.description,
+    approvalStatus: tuition.approvalStatus,
+    isActive: tuition.isActive,
+    createdAt: tuition.createdAt,
+    updatedAt: tuition.updatedAt,
   };
 }

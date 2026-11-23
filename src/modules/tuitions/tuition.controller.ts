@@ -10,6 +10,7 @@ import {
   deleteTuition,
   getFeaturedTuitions,
   getTutorTuitions,
+  getTutorTuitionById,
   getPublicTuitionById,
   getPublicTuitions,
   updateTuition,
@@ -178,5 +179,24 @@ export const getMyTuitions: RequestHandler = async (
     message: "Your tuition listings retrieved successfully.",
     data: result.tuitions,
     pagination: result.pagination,
+  });
+};
+
+// GET /api/tuitions/mine/:id
+export const getMyTuitionById: RequestHandler = async (
+  req,
+  res
+) => {
+  const currentUser = getCurrentUser(req);
+
+  const { id } = res.locals.validatedRequest.params as {
+    id: string;
+  };
+
+  const tuition = await getTutorTuitionById(id, currentUser);
+
+  sendSuccess(res, {
+    message: "Your tuition details retrieved successfully.",
+    data: tuition,
   });
 };

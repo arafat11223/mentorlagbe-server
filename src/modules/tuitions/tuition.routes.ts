@@ -18,6 +18,7 @@ import {
   deleteTuitionPost,
   getFeatured,
   getMyTuitions,
+  getMyTuitionById,
   getTuitionById,
   getTuitions,
   updateTuitionPost,
@@ -36,6 +37,13 @@ router.get(
   getMyTuitions
 );
 
+router.get(
+  "/mine/:id",
+  requireAuth,
+  requireRole("tutor"),
+  validateRequest(mongoIdSchema),
+  getMyTuitionById
+);
 // Public routes
 router.get(
   "/featured",
