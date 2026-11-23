@@ -1,4 +1,4 @@
-import { z } from "zod";
+﻿import { z } from "zod";
 
 const tuitionTypeSchema = z.enum([
   "group",
@@ -94,7 +94,12 @@ export const updateTuitionSchema = z.object({
 
 export const tuitionListQuerySchema = z.object({
   query: z.object({
-    page: z.coerce.number().int().min(1).default(1),
+    page: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(10000, "Page cannot exceed 10000.")
+      .default(1),
 
     limit: z.coerce.number().int().min(1).max(50).default(9),
 
