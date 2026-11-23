@@ -1,5 +1,4 @@
-
-import { ObjectId, type Filter } from "mongodb";
+﻿import { ObjectId, type Filter, type WithId } from "mongodb";
 
 import { tuitionRepository } from "../../repositories/index.js";
 import { tuitionsCollection } from "../../config/database.js";
@@ -32,6 +31,32 @@ export interface TuitionListQuery {
   classLevel?: string;
   mode?: "online" | "offline";
   sort: "latest";
+}
+
+// Public fields shared by tuition listing and details.
+function toPublicTuitionSummary(tuition: WithId<TuitionDocument>) {
+  return {
+    _id: tuition._id,
+    title: tuition.title,
+    tuitionType: tuition.tuitionType,
+    subject: tuition.subject,
+    classLevel: tuition.classLevel,
+    mode: tuition.mode,
+    location: tuition.location,
+    monthlyFee: tuition.monthlyFee,
+    daysPerWeek: tuition.daysPerWeek,
+    tutorName: tuition.tutorName,
+    createdAt: tuition.createdAt,
+  };
+}
+
+// Additional fields needed only on the details page.
+function toPublicTuitionDetails(tuition: WithId<TuitionDocument>) {
+  return {
+    ...toPublicTuitionSummary(tuition),
+    bannerImage: tuition.bannerImage,
+    description: tuition.description,
+  };
 }
 
 // Escape special regex characters from user input.
@@ -153,7 +178,7 @@ export async function getPublicTuitions(
   ]);
 
   return {
-    tuitions,
+    tuitions: tuitions.map(toPublicTuitionSummary),
     pagination: {
       page,
       limit,
@@ -165,11 +190,13 @@ export async function getPublicTuitions(
 
 // Get featured public tuition posts.
 export async function getFeaturedTuitions() {
-  return tuitionsCollection()
+  const tuitions = await tuitionsCollection()
     .find(getPublicFilter())
     .sort({ createdAt: -1 })
     .limit(6)
     .toArray();
+
+  return tuitions.map(toPublicTuitionSummary);
 }
 
 // Get one public tuition post.
@@ -189,7 +216,7 @@ export async function getPublicTuitionById(id: string) {
     throw new AppError("Tuition post not found.", 404);
   }
 
-  return tuition;
+  return toPublicTuitionDetails(tuition);
 }
 
 // Update a tutor's own tuition post.
