@@ -1,8 +1,13 @@
-﻿import type { RequestHandler } from "express";
+import type { RequestHandler } from "express";
+import { fromNodeHeaders } from "better-auth/node";
 
+import { auth } from "../../lib/auth.js";
 import { AppError } from "../../utils/AppError.js";
 import { sendSuccess } from "../../utils/apiResponse.js";
-import { updateBusinessUserImage } from "./user.service.js";
+import {
+  updateBusinessUserImage,
+  updateBusinessUserProfile,
+} from "./user.service.js";
 
 export const getMyProfile: RequestHandler = (
   req,
@@ -32,6 +37,45 @@ export const getMyProfile: RequestHandler = (
       updatedAt: user.updatedAt,
     },
   });
+};
+
+export const updateMyProfile: RequestHandler = async (
+  req,
+  res,
+  next
+) => {
+  try {
+    const user = req.currentUser;
+
+    if (!user) {
+      throw new AppError("User profile not found.", 404);
+    }
+
+    const profile = res.locals.validatedRequest.body as {
+      name: string;
+      phone: string | null;
+      bio: string;
+    };
+
+    await auth.api.updateUser({
+      headers: fromNodeHeaders(req.headers),
+      body: {
+        name: profile.name,
+      },
+    });
+
+    await updateBusinessUserProfile(
+      user.authUserId,
+      profile
+    );
+
+    return sendSuccess(res, {
+      message: "Your profile updated successfully.",
+      data: profile,
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 export const updateMyProfileImage: RequestHandler = async (

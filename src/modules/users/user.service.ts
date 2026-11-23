@@ -1,4 +1,4 @@
-﻿import { usersCollection } from "../../config/database.js";
+import { usersCollection } from "../../config/database.js";
 import type { UserRole } from "../../types/database.js";
 
 interface SyncBusinessUserInput {
@@ -7,6 +7,12 @@ interface SyncBusinessUserInput {
   email: string;
   image: string | null;
   role: unknown;
+}
+
+interface UpdateBusinessUserProfileInput {
+  name: string;
+  phone: string | null;
+  bio: string;
 }
 
 function isPublicRole(
@@ -82,6 +88,27 @@ export async function updateBusinessUserImage(
     {
       $set: {
         image,
+        updatedAt: new Date(),
+      },
+    }
+  );
+
+  if (result.matchedCount === 0) {
+    throw new Error("User profile not found.");
+  }
+}
+
+export async function updateBusinessUserProfile(
+  authUserId: string,
+  input: UpdateBusinessUserProfileInput
+): Promise<void> {
+  const result = await usersCollection().updateOne(
+    { authUserId },
+    {
+      $set: {
+        name: input.name,
+        phone: input.phone,
+        bio: input.bio,
         updatedAt: new Date(),
       },
     }
