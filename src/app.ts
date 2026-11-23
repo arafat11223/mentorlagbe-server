@@ -17,6 +17,7 @@ import tuitionRoutes from "./modules/tuitions/tuition.routes.js";
 import statisticsRoutes from "./modules/statistics/statistics.routes.js";
 import dashboardRoutes from "./modules/dashboard/dashboard.routes.js";
 import adminRoutes from "./modules/admin/admin.routes.js";
+import uploadRoutes from "./modules/uploads/upload.routes.js";
 
 const app = express();
 
@@ -64,6 +65,7 @@ app.use("/api/tuitions", tuitionRoutes);
 app.use("/api/statistics", statisticsRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/uploads", uploadRoutes);
 
 // Handle unknown routes
 app.use(notFound);
