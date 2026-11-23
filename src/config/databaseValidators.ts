@@ -177,7 +177,7 @@ const schemas: Record<string, Document> = {
         minimum: 0,
       },
       currency: {
-        enum: ["bdt"],
+        enum: ["usd"],
       },
       transactionId: nullableString,
       stripeSessionId: { bsonType: "string" },

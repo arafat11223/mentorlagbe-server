@@ -118,7 +118,7 @@ export interface PaymentDocument extends BaseDocument {
   planName: string;
 
   amount: number;
-  currency: "bdt";
+  currency: "usd";
 
   transactionId: string | null;
   stripeSessionId: string;

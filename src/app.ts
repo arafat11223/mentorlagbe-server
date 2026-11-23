@@ -19,6 +19,8 @@ import dashboardRoutes from "./modules/dashboard/dashboard.routes.js";
 import adminRoutes from "./modules/admin/admin.routes.js";
 import uploadRoutes from "./modules/uploads/upload.routes.js";
 import applicationRoutes from "./modules/applications/application.routes.js";
+import paymentRoutes from "./modules/payments/payment.routes.js";
+import { stripeWebhook } from "./modules/payments/payment.controller.js";
 
 const app = express();
 
@@ -38,6 +40,9 @@ app.use(morgan(env.NODE_ENV === "development" ? "dev" : "combined"));
 
 // Better Auth must be mounted before body parsers.
 app.all("/api/auth/*splat", toNodeHandler(auth));
+
+// Stripe requires the original raw request body for signature verification.
+app.post("/api/payments/webhook", express.raw({ type: "application/json" }), stripeWebhook);
 
 // Parse JSON request bodies for other API routes
 app.use(express.json({ limit: "1mb" }));
@@ -68,6 +73,7 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/uploads", uploadRoutes);
 app.use("/api/applications", applicationRoutes);
+app.use("/api/payments", paymentRoutes);
 
 // Handle unknown routes
 app.use(notFound);
