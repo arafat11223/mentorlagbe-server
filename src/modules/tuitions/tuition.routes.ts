@@ -7,6 +7,7 @@ import { validateRequest } from "../../middleware/validateRequest.js";
 import {
   createTuitionSchema,
   mongoIdSchema,
+  tutorTuitionListQuerySchema,
   tuitionListQuerySchema,
   updateTuitionSchema,
   updateTuitionStatusSchema,
@@ -16,6 +17,7 @@ import {
   createTuitionPost,
   deleteTuitionPost,
   getFeatured,
+  getMyTuitions,
   getTuitionById,
   getTuitions,
   updateTuitionPost,
@@ -23,6 +25,16 @@ import {
 } from "./tuition.controller.js";
 
 const router = Router();
+
+// Tutor-only routes.
+// Keep /mine before /:id to prevent route conflicts.
+router.get(
+  "/mine",
+  requireAuth,
+  requireRole("tutor"),
+  validateRequest(tutorTuitionListQuerySchema),
+  getMyTuitions
+);
 
 // Public routes
 router.get(
@@ -42,7 +54,7 @@ router.get(
   getTuitionById
 );
 
-// Tutor-only routes
+// Tutor-only write routes
 router.post(
   "/",
   requireAuth,

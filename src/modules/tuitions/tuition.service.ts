@@ -315,3 +315,64 @@ export async function updateTuitionStatus(
 
   return tuitionRepository.findById(tuitionId);
 }
+
+// Get the authenticated tutor's non-deleted tuition posts.
+export interface TutorTuitionListQuery {
+  page: number;
+  limit: number;
+  approvalStatus?: "pending" | "approved" | "rejected";
+}
+
+export async function getTutorTuitions(
+  currentUser: UserDocument,
+  query: TutorTuitionListQuery
+) {
+  const filter: Filter<TuitionDocument> = {
+    tutorId: currentUser._id,
+    deletedAt: null,
+  };
+
+  if (query.approvalStatus) {
+    filter.approvalStatus = query.approvalStatus;
+  }
+
+  const collection = tuitionsCollection();
+  const skip = (query.page - 1) * query.limit;
+
+  const [tuitions, total] = await Promise.all([
+    collection
+      .find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(query.limit)
+      .toArray(),
+
+    collection.countDocuments(filter),
+  ]);
+
+  return {
+    tuitions: tuitions.map((tuition) => ({
+      _id: tuition._id,
+      title: tuition.title,
+      tuitionType: tuition.tuitionType,
+      subject: tuition.subject,
+      classLevel: tuition.classLevel,
+      mode: tuition.mode,
+      location: tuition.location,
+      monthlyFee: tuition.monthlyFee,
+      daysPerWeek: tuition.daysPerWeek,
+      bannerImage: tuition.bannerImage,
+      description: tuition.description,
+      approvalStatus: tuition.approvalStatus,
+      isActive: tuition.isActive,
+      createdAt: tuition.createdAt,
+      updatedAt: tuition.updatedAt,
+    })),
+    pagination: {
+      page: query.page,
+      limit: query.limit,
+      total,
+      totalPages: Math.ceil(total / query.limit),
+    },
+  };
+}

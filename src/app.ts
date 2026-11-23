@@ -1,4 +1,4 @@
-﻿import express from "express";
+import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
@@ -16,6 +16,7 @@ import userRoutes from "./modules/users/user.routes.js";
 import tuitionRoutes from "./modules/tuitions/tuition.routes.js";
 import statisticsRoutes from "./modules/statistics/statistics.routes.js";
 import dashboardRoutes from "./modules/dashboard/dashboard.routes.js";
+import adminRoutes from "./modules/admin/admin.routes.js";
 
 const app = express();
 
@@ -62,6 +63,7 @@ app.use("/api/tuitions", tuitionRoutes);
 // Public platform statistics
 app.use("/api/statistics", statisticsRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/admin", adminRoutes);
 
 // Handle unknown routes
 app.use(notFound);

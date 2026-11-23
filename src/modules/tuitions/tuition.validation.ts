@@ -132,3 +132,30 @@ export const updateTuitionApprovalSchema = z.object({
 export const mongoIdSchema = z.object({
   params: tuitionIdParamsSchema,
 });
+
+// Authenticated tutor's own tuition listing query.
+export const tutorTuitionListQuerySchema = z.object({
+  query: z.object({
+    page: z.coerce.number().int().min(1).max(10000).default(1),
+    limit: z.coerce.number().int().min(1).max(50).default(10),
+    approvalStatus: z.enum([
+      "pending",
+      "approved",
+      "rejected",
+    ]).optional(),
+  }),
+});
+
+// Admin tuition moderation listing query.
+export const adminTuitionListQuerySchema = z.object({
+  query: z.object({
+    page: z.coerce.number().int().min(1).max(10000).default(1),
+    limit: z.coerce.number().int().min(1).max(50).default(10),
+    approvalStatus: z.enum([
+      "pending",
+      "approved",
+      "rejected",
+    ]).optional(),
+    search: z.string().trim().max(100).optional(),
+  }),
+});
