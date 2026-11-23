@@ -1,5 +1,4 @@
-
-import { usersCollection } from "../../config/database.js";
+﻿import { usersCollection } from "../../config/database.js";
 import type { UserRole } from "../../types/database.js";
 
 interface SyncBusinessUserInput {
@@ -10,7 +9,9 @@ interface SyncBusinessUserInput {
   role: unknown;
 }
 
-function isPublicRole(role: unknown): role is Extract<UserRole, "student" | "tutor"> {
+function isPublicRole(
+  role: unknown
+): role is Extract<UserRole, "student" | "tutor"> {
   return role === "student" || role === "tutor";
 }
 
@@ -26,7 +27,9 @@ export async function syncBusinessUserProfile(
   } = input;
 
   if (!authUserId || !name || !email) {
-    throw new Error("Required authentication user information is missing.");
+    throw new Error(
+      "Required authentication user information is missing."
+    );
   }
 
   if (!isPublicRole(role)) {
@@ -35,7 +38,6 @@ export async function syncBusinessUserProfile(
 
   const collection = usersCollection();
 
-  // Prevent linking an existing profile to a different auth account.
   const existingByEmail = await collection.findOne({ email });
 
   if (
@@ -49,19 +51,18 @@ export async function syncBusinessUserProfile(
 
   const now = new Date();
 
-  // Upsert makes profile synchronization idempotent.
   await collection.updateOne(
     { authUserId },
     {
       $set: {
         name,
         email,
-        image,
         updatedAt: now,
       },
       $setOnInsert: {
         authUserId,
         role,
+        image,
         phone: null,
         bio: "",
         plan: "free",
@@ -70,4 +71,23 @@ export async function syncBusinessUserProfile(
     },
     { upsert: true }
   );
+}
+
+export async function updateBusinessUserImage(
+  authUserId: string,
+  image: string | null
+): Promise<void> {
+  const result = await usersCollection().updateOne(
+    { authUserId },
+    {
+      $set: {
+        image,
+        updatedAt: new Date(),
+      },
+    }
+  );
+
+  if (result.matchedCount === 0) {
+    throw new Error("User profile not found.");
+  }
 }
