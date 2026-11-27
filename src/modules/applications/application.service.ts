@@ -1,4 +1,4 @@
-﻿import { ObjectId } from "mongodb";
+import { ObjectId } from "mongodb";
 
 import {
   applicationsCollection,
@@ -19,6 +19,11 @@ interface CreateApplicationInput {
   studentNote: string;
 }
 
+
+export interface ApplicationListQuery {
+  page: number;
+  limit: number;
+}
 function ensureValidId(id: string): ObjectId {
   if (!ObjectId.isValid(id)) {
     throw new AppError("Invalid resource ID.", 400);
@@ -113,12 +118,40 @@ export async function createApplication(
 }
 
 export async function getStudentApplications(
-  studentId: ObjectId
-): Promise<ApplicationDocument[]> {
-  return applicationsCollection()
-    .find({ studentId })
-    .sort({ appliedAt: -1 })
-    .toArray();
+  studentId: ObjectId,
+  query: ApplicationListQuery
+): Promise<{
+  applications: ApplicationDocument[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}> {
+  const { page, limit } = query;
+  const skip = (page - 1) * limit;
+  const filter = { studentId };
+
+  const [applications, total] = await Promise.all([
+    applicationsCollection()
+      .find(filter)
+      .sort({ appliedAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .toArray(),
+    applicationsCollection().countDocuments(filter),
+  ]);
+
+  return {
+    applications,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+  };
 }
 
 export async function cancelStudentApplication(
@@ -170,12 +203,40 @@ export async function cancelStudentApplication(
 }
 
 export async function getTutorApplications(
-  tutorId: ObjectId
-): Promise<ApplicationDocument[]> {
-  return applicationsCollection()
-    .find({ tutorId })
-    .sort({ appliedAt: -1 })
-    .toArray();
+  tutorId: ObjectId,
+  query: ApplicationListQuery
+): Promise<{
+  applications: ApplicationDocument[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}> {
+  const { page, limit } = query;
+  const skip = (page - 1) * limit;
+  const filter = { tutorId };
+
+  const [applications, total] = await Promise.all([
+    applicationsCollection()
+      .find(filter)
+      .sort({ appliedAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .toArray(),
+    applicationsCollection().countDocuments(filter),
+  ]);
+
+  return {
+    applications,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+  };
 }
 
 export async function updateTutorApplicationStatus(

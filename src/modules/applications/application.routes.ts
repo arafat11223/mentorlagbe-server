@@ -1,4 +1,4 @@
-﻿import { Router } from "express";
+import { Router } from "express";
 
 import { requireAuth } from "../../middleware/auth.js";
 import { requireRole } from "../../middleware/authorize.js";
@@ -16,6 +16,7 @@ import {
   createApplicationSchema,
   updateApplicationStatusSchema,
   applicationIdSchema,
+  applicationsListQuerySchema,
 } from "./application.validation.js";
 
 const router = Router();
@@ -25,6 +26,7 @@ router.get(
   "/mine",
   requireAuth,
   requireRole("student"),
+  validateRequest(applicationsListQuerySchema),
   getMyApplications
 );
 
@@ -49,6 +51,7 @@ router.get(
   "/tutor",
   requireAuth,
   requireRole("tutor"),
+  validateRequest(applicationsListQuerySchema),
   getApplicationsForTutor
 );
 

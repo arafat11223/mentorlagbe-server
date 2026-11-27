@@ -1,4 +1,4 @@
-﻿import type { RequestHandler } from "express";
+import type { RequestHandler } from "express";
 
 import { sendSuccess } from "../../utils/apiResponse.js";
 
@@ -8,6 +8,7 @@ import {
   cancelStudentApplication,
   getTutorApplications,
   updateTutorApplicationStatus,
+  type ApplicationListQuery,
 } from "./application.service.js";
 
 export const createApplication: RequestHandler = async (
@@ -40,13 +41,19 @@ export const getMyApplications: RequestHandler = async (
   req,
   res
 ) => {
-  const applications = await getStudentApplications(
-    req.currentUser!._id
+  const query = res.locals.validatedRequest.query as ApplicationListQuery;
+
+  const result = await getStudentApplications(
+    req.currentUser!._id,
+    query
   );
 
-  return sendSuccess(res, {
+  return res.status(200).json({
+    success: true,
+    status: "success",
     message: "Your applications retrieved successfully.",
-    data: applications,
+    data: result.applications,
+    pagination: result.pagination,
   });
 };
 
@@ -73,13 +80,19 @@ export const getApplicationsForTutor: RequestHandler = async (
   req,
   res
 ) => {
-  const applications = await getTutorApplications(
-    req.currentUser!._id
+  const query = res.locals.validatedRequest.query as ApplicationListQuery;
+
+  const result = await getTutorApplications(
+    req.currentUser!._id,
+    query
   );
 
-  return sendSuccess(res, {
+  return res.status(200).json({
+    success: true,
+    status: "success",
     message: "Tutor applications retrieved successfully.",
-    data: applications,
+    data: result.applications,
+    pagination: result.pagination,
   });
 };
 
