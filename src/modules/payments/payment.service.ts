@@ -29,6 +29,14 @@ const PLAN_PRICES = {
   },
 } as const;
 
+type CheckoutRole = keyof typeof PLAN_PRICES;
+
+type CheckoutVerificationResult = {
+  paymentStatus: "paid" | "pending";
+  plan: "free" | "pro";
+  activated: boolean;
+};
+
 function getStripeClient(): Stripe {
   if (!env.STRIPE_SECRET_KEY) {
     throw new AppError(
@@ -40,10 +48,83 @@ function getStripeClient(): Stripe {
   return new Stripe(env.STRIPE_SECRET_KEY);
 }
 
+function isCheckoutRole(role: string): role is CheckoutRole {
+  return role === "student" || role === "tutor";
+}
+
+function validateCheckoutSession(
+  session: Stripe.Checkout.Session,
+  expectedUser?: UserDocument
+): {
+  userId: ObjectId;
+  role: CheckoutRole;
+  pricing: (typeof PLAN_PRICES)[CheckoutRole];
+} {
+  const metadata = session.metadata;
+
+  if (
+    !metadata?.userId ||
+    !metadata.userRole ||
+    !metadata.planName ||
+    !ObjectId.isValid(metadata.userId) ||
+    session.client_reference_id !== metadata.userId
+  ) {
+    throw new AppError(
+      "Stripe checkout metadata or client reference is invalid.",
+      400
+    );
+  }
+
+  if (!isCheckoutRole(metadata.userRole)) {
+    throw new AppError(
+      "Invalid user role in Stripe checkout.",
+      400
+    );
+  }
+
+  const role = metadata.userRole;
+  const pricing = PLAN_PRICES[role];
+  const userId = new ObjectId(metadata.userId);
+
+  if (
+    expectedUser &&
+    (
+      !expectedUser._id.equals(userId) ||
+      expectedUser.role !== role
+    )
+  ) {
+    throw new AppError(
+      "This checkout session does not belong to your account.",
+      403
+    );
+  }
+
+  if (
+    session.mode !== "payment" ||
+    metadata.planName !== pricing.planName ||
+    session.currency !== "usd" ||
+    (
+      session.amount_total !== null &&
+      session.amount_total !== pricing.unitAmount
+    )
+  ) {
+    throw new AppError(
+      "Stripe payment amount or plan verification failed.",
+      400
+    );
+  }
+
+  return {
+    userId,
+    role,
+    pricing,
+  };
+}
+
 export async function createCheckoutSession(
   user: UserDocument
 ): Promise<{ sessionId: string; url: string }> {
-  if (user.role !== "student" && user.role !== "tutor") {
+  if (!isCheckoutRole(user.role)) {
     throw new AppError(
       "Only students and tutors can purchase Pro plans.",
       403
@@ -90,7 +171,7 @@ export async function createCheckoutSession(
       `${env.CLIENT_URL}/payment/success` +
       "?session_id={CHECKOUT_SESSION_ID}",
 
-    cancel_url: `${env.CLIENT_URL}/pricing?payment=cancelled`,
+    cancel_url: `${env.CLIENT_URL}/payment/cancel`,
   });
 
   if (!session.url) {
@@ -122,9 +203,7 @@ export async function createCheckoutSession(
 
   await paymentsCollection().updateOne(
     { stripeSessionId: session.id },
-    {
-      $setOnInsert: payment,
-    },
+    { $setOnInsert: payment },
     { upsert: true }
   );
 
@@ -144,12 +223,10 @@ export async function getMyPaymentHistory(
     .toArray();
 }
 
-async function handleCompletedCheckout(
-  event: Stripe.Event
+async function processPaidCheckoutSession(
+  session: Stripe.Checkout.Session,
+  eventId?: string
 ): Promise<void> {
-  const session = event.data.object as Stripe.Checkout.Session;
-
-  // Only one-time paid Checkout sessions can activate Pro.
   if (
     session.mode !== "payment" ||
     session.payment_status !== "paid"
@@ -157,46 +234,17 @@ async function handleCompletedCheckout(
     return;
   }
 
-  const metadata = session.metadata;
+  const { userId, role, pricing } =
+    validateCheckoutSession(session);
 
-  if (
-    !metadata?.userId ||
-    !metadata.userRole ||
-    !metadata.planName ||
-    !ObjectId.isValid(metadata.userId) ||
-    session.client_reference_id !== metadata.userId
-  ) {
+
+  // Never activate a Pro plan unless Stripe confirms the exact server-side amount.
+  if (session.amount_total !== pricing.unitAmount) {
     throw new AppError(
-      "Stripe checkout metadata or client reference is invalid.",
+      "Stripe payment amount verification failed.",
       400
     );
   }
-
-  const role = metadata.userRole;
-
-  if (role !== "student" && role !== "tutor") {
-    throw new AppError(
-      "Invalid user role in Stripe checkout.",
-      400
-    );
-  }
-
-  const pricing = PLAN_PRICES[role];
-
-  // Verify server-defined pricing; never trust client-supplied amounts.
-  if (
-    metadata.planName !== pricing.planName ||
-    session.currency !== "usd" ||
-    session.amount_total !== pricing.unitAmount
-  ) {
-    throw new AppError(
-      "Stripe payment amount or plan verification failed.",
-      400
-    );
-  }
-
-  const userId = new ObjectId(metadata.userId);
-
   const user = await usersCollection().findOne({
     _id: userId,
     role,
@@ -216,7 +264,13 @@ async function handleCompletedCheckout(
       ? session.payment_intent
       : session.payment_intent?.id ?? null;
 
-  // Check an existing record before creating or changing its state.
+  if (!transactionId) {
+    throw new AppError(
+      "The Stripe transaction could not be verified.",
+      400
+    );
+  }
+
   const existingPayment = await paymentsCollection().findOne({
     stripeSessionId: session.id,
   });
@@ -237,7 +291,6 @@ async function handleCompletedCheckout(
     );
   }
 
-  // Create a pending record if the webhook arrives before checkout storage.
   const pendingPayment: PaymentDocument = {
     _id: new ObjectId(),
     userId: user._id,
@@ -262,7 +315,17 @@ async function handleCompletedCheckout(
     { upsert: true }
   );
 
-  // Atomic state transition: only a non-paid record can become paid.
+  const paymentUpdate: Record<string, unknown> = {
+    transactionId,
+    paymentStatus: "paid",
+    paidAt: now,
+    updatedAt: now,
+  };
+
+  if (eventId) {
+    paymentUpdate.stripeEventId = eventId;
+  }
+
   await paymentsCollection().updateOne(
     {
       stripeSessionId: session.id,
@@ -270,17 +333,28 @@ async function handleCompletedCheckout(
       paymentStatus: { $ne: "paid" },
     },
     {
-      $set: {
-        transactionId,
-        stripeEventId: event.id,
-        paymentStatus: "paid",
-        paidAt: now,
-        updatedAt: now,
-      },
+      $set: paymentUpdate,
     }
   );
 
-  // Verify the persisted state before activating the user's plan.
+  // A webhook arriving after verification can still record its event ID.
+  if (eventId) {
+    await paymentsCollection().updateOne(
+      {
+        stripeSessionId: session.id,
+        userId: user._id,
+        paymentStatus: "paid",
+        stripeEventId: null,
+      },
+      {
+        $set: {
+          stripeEventId: eventId,
+          updatedAt: now,
+        },
+      }
+    );
+  }
+
   const verifiedPayment = await paymentsCollection().findOne({
     stripeSessionId: session.id,
     userId: user._id,
@@ -294,7 +368,6 @@ async function handleCompletedCheckout(
     );
   }
 
-  // Idempotent activation also repairs a retry after a partial failure.
   const activation = await usersCollection().updateOne(
     { _id: user._id, role },
     {
@@ -312,6 +385,65 @@ async function handleCompletedCheckout(
     );
   }
 }
+
+export async function verifyCheckoutSession(
+  sessionId: string,
+  currentUser: UserDocument
+): Promise<CheckoutVerificationResult> {
+  if (!isCheckoutRole(currentUser.role)) {
+    throw new AppError(
+      "Only students and tutors can verify a Pro checkout.",
+      403
+    );
+  }
+
+  if (!sessionId.trim()) {
+    throw new AppError(
+      "A Stripe checkout session ID is required.",
+      400
+    );
+  }
+
+  const stripe = getStripeClient();
+
+  let session: Stripe.Checkout.Session;
+
+  try {
+    session = await stripe.checkout.sessions.retrieve(sessionId);
+  } catch {
+    throw new AppError(
+      "The Stripe checkout session could not be found.",
+      404
+    );
+  }
+
+  validateCheckoutSession(session, currentUser);
+
+  if (session.mode !== "payment") {
+    throw new AppError(
+      "This is not a valid one-time checkout session.",
+      400
+    );
+  }
+
+  if (session.payment_status !== "paid") {
+    return {
+      paymentStatus: "pending",
+      plan: currentUser.plan,
+      activated: false,
+    };
+  }
+
+  // Same processing function is used by both verification and webhook.
+  await processPaidCheckoutSession(session);
+
+  return {
+    paymentStatus: "paid",
+    plan: "pro",
+    activated: true,
+  };
+}
+
 export async function processStripeWebhook(
   rawBody: Buffer,
   signature: string
@@ -341,6 +473,8 @@ export async function processStripeWebhook(
   }
 
   if (event.type === "checkout.session.completed") {
-    await handleCompletedCheckout(event);
+    const session = event.data.object as Stripe.Checkout.Session;
+
+    await processPaidCheckoutSession(session, event.id);
   }
 }

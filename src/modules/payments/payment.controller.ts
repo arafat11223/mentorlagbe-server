@@ -6,6 +6,7 @@ import {
   createCheckoutSession as createCheckoutSessionService,
   getMyPaymentHistory,
   processStripeWebhook,
+  verifyCheckoutSession as verifyCheckoutSessionService,
 } from "./payment.service.js";
 
 export const createCheckoutSession: RequestHandler = async (
@@ -19,6 +20,30 @@ export const createCheckoutSession: RequestHandler = async (
   return sendSuccess(res, {
     message: "Stripe Checkout session created successfully.",
     data: checkout,
+  });
+};
+
+export const verifyCheckoutSession: RequestHandler = async (
+  req,
+  res
+) => {
+  const validatedRequest = res.locals.validatedRequest as {
+    body: {
+      sessionId: string;
+    };
+  };
+
+  const verification = await verifyCheckoutSessionService(
+    validatedRequest.body.sessionId,
+    req.currentUser!
+  );
+
+  return sendSuccess(res, {
+    message:
+      verification.paymentStatus === "paid"
+        ? "Payment verified and membership activated."
+        : "Payment is not confirmed yet.",
+    data: verification,
   });
 };
 
